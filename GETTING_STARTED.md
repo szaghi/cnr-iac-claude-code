@@ -1,4 +1,4 @@
-# Claude Code at CNR-IAC — Researcher Onboarding
+# Claude Code at CNR-IAC — Getting Started
 
 **Audience.** CNR-IAC researchers in mathematics, physics, and HPC who
 already write code (in any programming language) and now have access to the
@@ -13,7 +13,7 @@ in the underlying science.
 **Status.** Living document maintained by Stefano Zaghi (beta-tester for the
 team account, `stefano.zaghi@cnr.it`). Corrections, additions, and surprising
 experiences worth recording are welcome — see
-[§16 Getting help](#16-getting-help) for how to open a GitHub issue (with a
+[§17 Getting help](#17-getting-help) for how to open a GitHub issue (with a
 step-by-step for colleagues new to GitHub).
 
 ---
@@ -31,12 +31,13 @@ step-by-step for colleagues new to GitHub).
  9. [Memory and persistence](#9-memory-and-persistence)
 10. [Remote control — driving Claude from another device](#10-remote-control--driving-claude-from-another-device)
 11. [Useful skills, plugins, and commands](#11-useful-skills-plugins-and-commands)
-12. [Cost discipline](#12-cost-discipline)
-13. [HPC-specific prompt patterns](#13-hpc-specific-prompt-patterns)
-14. [Safety rails](#14-safety-rails)
-15. [CNR-IAC data governance](#15-cnr-iac-data-governance) — **TODO, fill from institute policy**
-16. [Getting help](#16-getting-help)
-17. [Appendix — glossary](#17-appendix--glossary)
+12. [Status line tutorial — see your model, branch, context, and rate-limit usage at a glance](#12-status-line-tutorial)
+13. [Cost discipline](#13-cost-discipline)
+14. [HPC-specific prompt patterns](#14-hpc-specific-prompt-patterns)
+15. [Safety rails](#15-safety-rails)
+16. [CNR-IAC data governance](#16-cnr-iac-data-governance) — **TODO, fill from institute policy**
+17. [Getting help](#17-getting-help)
+18. [Appendix — glossary](#18-appendix--glossary)
 
 ---
 
@@ -53,7 +54,7 @@ directly, under your supervision.
 | A terminal-native agent that reads and edits your files     | A chat window that returns text for you to paste                                  |
 | A pair-programmer that follows your prompts literally       | A replacement for understanding your own code                                     |
 | A driver for shell commands, compilers, tests, and git      | An HPC scheduler — it does not know about Slurm queues unless you tell it         |
-| A cloud service — every prompt and read file goes to Anthropic | Offline-capable — see [§15 Data governance](#15-cnr-iac-data-governance)        |
+| A cloud service — every prompt and read file goes to Anthropic | Offline-capable — see [§16 Data governance](#16-cnr-iac-data-governance)        |
 | Domain-agnostic — it has read a lot of code                 | Familiar with *your* code on first launch — context starts empty                  |
 
 > **Mental model.** A sharp, fast pair-programmer who has read a lot of code
@@ -1044,7 +1045,187 @@ file** adding a row. Over time §11 becomes the institute's curated index.
 
 ---
 
-## 12. Cost discipline
+## 12. Status line tutorial
+
+The status line is the single thinnest strip of pixels in Claude Code, and
+also one of the highest-leverage customisations. It runs after every
+assistant message and displays whatever your script prints: model, branch,
+git status, context-window usage, rate-limit headroom. Once configured, you
+stop asking *"how close am I to the 5-hour cap?"* — you can see it.
+
+> Official documentation:
+> [`https://code.claude.com/docs/en/statusline`](https://code.claude.com/docs/en/statusline)
+> — read it for the full JSON schema and additional examples. The walkthrough
+> below sets up the example script shipped with this repo at
+> [`examples/statusline-command.sh`](./examples/statusline-command.sh).
+
+### 12.1 What the example status line shows
+
+A single rendered line looks roughly like this (Solarized-dark palette,
+separators trimmed for readability):
+
+```
+Sonnet 4.6 │ my-project │ master [+? ↑2] │ ctx:23% │ 5h:41%(2h17m) 7d:18%(3d4h)
+```
+
+Each segment, left to right:
+
+| Segment                        | Source field(s)                                                  | Meaning                                                                            |
+| ------------------------------ | ---------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `Sonnet 4.6`                   | `model.display_name`                                             | Active model. Coloured violet                                                       |
+| `my-project`                   | `workspace.current_dir` (basename)                               | Current directory. Coloured blue                                                    |
+| `master [+? ↑2]`               | `git symbolic-ref` + `git diff` + upstream comparison            | Branch and dirty-state flags. `+` staged, `!` modified, `?` untracked, `$` stash, `↑N`/`↓N` ahead/behind |
+| `ctx:23%`                      | `context_window.used_percentage`                                 | Context-window usage. Colour shifts green → yellow → orange → red at 50/80/95%      |
+| `5h:41%(2h17m)`                | `rate_limits.five_hour.used_percentage` + `resets_at`            | 5-hour rate-limit usage and time until reset                                        |
+| `7d:18%(3d4h)`                 | `rate_limits.seven_day.used_percentage` + `resets_at`            | 7-day rate-limit usage and time until reset                                         |
+
+Any segment missing data is silently dropped — e.g. outside a git repo,
+the git segment disappears.
+
+### 12.2 How status lines work, in 30 seconds
+
+```
+Claude Code  ── JSON via stdin ──▶  your script  ── ANSI text via stdout ──▶  rendered line
+```
+
+- Your script runs **after each new assistant message**, after `/compact`,
+  on permission-mode change, and on vim-mode toggle.
+- Updates are debounced at 300 ms. In-flight executions are cancelled if a
+  newer update fires.
+- The script receives a JSON blob on stdin. Top-level keys include
+  `model`, `workspace`, `cost`, `context_window`, `rate_limits`, `effort`.
+  Full schema is in the official doc.
+- Whatever the script prints to stdout becomes the status line. ANSI colour
+  escapes are honoured. Newlines produce a multi-line status.
+
+### 12.3 Step-by-step install (the explicit path)
+
+This walkthrough wires up the example script verbatim. The five steps are
+deliberately small.
+
+**Step 1 — copy the script into your Claude config.**
+
+```bash
+mkdir -p ~/.claude
+curl -fsSL https://raw.githubusercontent.com/szaghi/cnr-iac-claude-code/main/examples/statusline-command.sh \
+  -o ~/.claude/statusline-command.sh
+```
+
+Or, if you have this repo cloned locally:
+
+```bash
+cp ~/path/to/cnr-iac-claude-code/examples/statusline-command.sh ~/.claude/
+```
+
+**Step 2 — mark it executable.**
+
+```bash
+chmod +x ~/.claude/statusline-command.sh
+```
+
+**Step 3 — declare it in `~/.claude/settings.json`.** Add (or merge) the
+`statusLine` block:
+
+```json
+{
+  "statusLine": {
+    "type": "command",
+    "command": "bash /home/YOUR_USERNAME/.claude/statusline-command.sh"
+  }
+}
+```
+
+Use the absolute path. `~` is *not* expanded inside the JSON value on every
+platform — be explicit.
+
+**Step 4 — verify the script works in isolation.** Pipe a mock JSON payload
+into it and watch what comes out:
+
+```bash
+cat <<'JSON' | bash ~/.claude/statusline-command.sh
+{
+  "model": {"display_name": "Sonnet 4.6"},
+  "workspace": {"current_dir": "/home/me/work/proj"},
+  "context_window": {"used_percentage": 23},
+  "rate_limits": {
+    "five_hour":  {"used_percentage": 41, "resets_at": 9999999999},
+    "seven_day":  {"used_percentage": 18, "resets_at": 9999999999}
+  }
+}
+JSON
+```
+
+You should see a coloured line printed to your terminal. If you see no
+output, see [§12.6 Troubleshooting](#126-troubleshooting).
+
+**Step 5 — restart Claude Code.** The status line appears at the bottom of
+the next session. If you edit the script later, the update applies on the
+next interaction (after Claude responds), not immediately.
+
+### 12.4 The fast path — `/statusline`
+
+Claude Code ships with a built-in `/statusline` command that generates a
+script from natural language and wires it into `settings.json`
+automatically. Useful when you want something other than the example
+above.
+
+Examples:
+
+```
+/statusline show model, branch, and context percentage
+/statusline like the example but without the rate-limit columns
+/statusline minimal — just the model and branch
+```
+
+Claude drafts the script under `~/.claude/`, updates your settings, and
+the next session picks it up. You can iterate on the same prompt until
+the layout matches your taste.
+
+> **Recommendation.** Start by installing the example script for the
+> learning value (you see what's possible), then use `/statusline` to
+> personalise.
+
+### 12.5 Understanding the example script
+
+The example is one bash file (~130 lines) plus an embedded Python helper
+to parse JSON without requiring `jq`. Skim the file once — the structure
+mirrors the segment table in [§12.1](#121-what-the-example-status-line-shows):
+
+1. **Colour helpers** — Solarized 256-colour palette via ANSI escapes.
+2. **JSON extraction** — one Python call reads stdin, pulls the fields
+   into shell variables. Using Python (not `jq`) means no extra
+   system dependency on minimal containers.
+3. **Per-segment rendering** — each segment is built into a `*_part`
+   shell variable; empty ones are skipped.
+4. **Threshold colouring** — `_pct_color` returns the ANSI escape
+   matching the usage band (green / yellow / orange / red at 50 / 80 /
+   95%).
+5. **Assembly** — non-empty parts are joined with the dim separator
+   `│` and printed.
+
+Two customisation hooks are deliberately easy:
+
+- **Palette.** Change the eight `\033[38;5;...` colour codes at the top
+  to match your terminal theme. Solarized-dark codes are 166/136/33/15/240/64/61/124.
+- **Add a segment.** Add a `*_part=""; if ...; *_part="..."` block and
+  append `"$your_part"` to the assembly loop at the bottom. The skipping
+  rule handles missing data for free.
+
+### 12.6 Troubleshooting
+
+| Symptom                                         | Likely cause                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------- |
+| No status line at all                           | `settings.json` block missing or `command` path wrong. Restart Claude. Run `claude doctor` |
+| Status line is blank                            | Script ran but produced no output. Test in isolation (Step 4 above)        |
+| `python3: command not found`                    | The example uses Python 3. Install it, or rewrite the extraction with `jq` |
+| Colours are wrong / show as `^[[38;5;...`       | Terminal does not interpret ANSI escapes. Use a terminal that does (almost any modern one) |
+| Rate-limit segment never appears                | `rate_limits` is absent from JSON for API-key users (only Pro/Max/Team see it), and is absent before the first API response of the session |
+| Git segment never appears                       | `cwd` is not inside a git working tree, *or* `git` is not on PATH for the Claude process |
+| Status line shows stale data                    | Updates fire after assistant messages; if nothing happened recently, the line stays. Set `"refreshInterval": 5` in the `statusLine` block to poll                  |
+
+---
+
+## 13. Cost discipline
 
 The team plan has finite capacity. Burning it on avoidable work hurts your
 colleagues. A few habits help.
@@ -1065,7 +1246,7 @@ colleagues. A few habits help.
 
 ---
 
-## 13. HPC-specific prompt patterns
+## 14. HPC-specific prompt patterns
 
 A few recipes that work well for math/physics/HPC code. Each is a template;
 adjust the file paths and specifics.
@@ -1146,7 +1327,7 @@ Show the test code first; do not add it to the build until I confirm.
 
 ---
 
-## 14. Safety rails
+## 15. Safety rails
 
 Claude Code defaults to confirming before destructive actions. Trust the
 default. Specifically:
@@ -1179,7 +1360,7 @@ Claude edit you regret cannot be reversed by ordinary git.
 
 ---
 
-## 15. CNR-IAC data governance
+## 16. CNR-IAC data governance
 
 > **TODO — fill from CNR-IAC institutional policy.**
 >
@@ -1205,16 +1386,16 @@ Claude edit you regret cannot be reversed by ordinary git.
 
 ---
 
-## 16. Getting help
+## 17. Getting help
 
-### 16.1 In-session
+### 17.1 In-session
 
 - `/help` — built-in command list.
 - `/doctor` or `claude doctor` — health check of install and config.
 - Ask Claude directly: *"how do I X with Claude Code?"* It knows its own
   features and will explain them.
 
-### 16.2 Official documentation
+### 17.2 Official documentation
 
 - Main docs portal:
   [`https://code.claude.com/docs/`](https://code.claude.com/docs/)
@@ -1225,7 +1406,7 @@ Claude edit you regret cannot be reversed by ordinary git.
 - Troubleshoot install:
   [`https://code.claude.com/docs/en/troubleshoot-install`](https://code.claude.com/docs/en/troubleshoot-install)
 
-### 16.3 Internal channel
+### 17.3 Internal channel
 
 Beta-tester contact: **Stefano Zaghi**, `stefano.zaghi@cnr.it`.
 
@@ -1233,7 +1414,7 @@ For non-trivial questions, *prefer the GitHub issue tracker over email* —
 the issue is searchable, reusable, and visible to other colleagues hitting
 the same problem.
 
-### 16.4 Opening a GitHub issue — for colleagues new to GitHub
+### 17.4 Opening a GitHub issue — for colleagues new to GitHub
 
 If you are unfamiliar with GitHub, the workflow looks intimidating but is
 straightforward. One-time setup, then a small number of clicks per issue.
@@ -1252,7 +1433,7 @@ repo, or use the command line just to open an issue.
 
 > `https://github.com/szaghi/cnr-iac-claude-code`
 
-You are looking at the same content as this onboarding document, hosted
+You are looking at the same content as this getting-started guide, hosted
 on GitHub.
 
 **Step 2 — go to the Issues tab.** Across the top of the page, between
@@ -1292,7 +1473,7 @@ is searchable by colleagues, links to commits and pull requests, becomes
 part of the project's history, and a future Claude session can be pointed
 at it as authoritative context (see [§9.5](#95-github-as-the-durable-memory-store)).
 
-### 16.5 Reporting bugs in Claude Code itself
+### 17.5 Reporting bugs in Claude Code itself
 
 For genuine Claude Code defects (not "the model gave a bad answer" — that
 is a prompt or model question):
@@ -1300,7 +1481,7 @@ is a prompt or model question):
 
 ---
 
-## 17. Appendix — glossary
+## 18. Appendix — glossary
 
 **Agent.** A Claude instance with a defined role, tools, and prompt. The
 *main agent* is the session you talk to. *Sub-agents* are spawned for

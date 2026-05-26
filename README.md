@@ -1,17 +1,17 @@
 # cnr-iac-claude-code
 
-> Onboarding and accumulated experience for **Claude Code** on the **CNR-IAC**
-team account. Aimed at researchers in mathematics, physics, and HPC who write
-code (in any programming language).
+> A getting-started guide and accumulated experience for **Claude Code** on the
+> **CNR-IAC** team account. Aimed at researchers in mathematics, physics, and
+> HPC who write code (in any programming language).
 
-**Start here:** [`ONBOARDING.md`](./ONBOARDING.md).
+**Start here:** [`GETTING_STARTED.md`](./GETTING_STARTED.md).
 
 ## What this repo is for
 
 The CNR-IAC institute holds a team-plan subscription to Claude Code (Anthropic's
 terminal-native coding agent). This repository collects:
 
-- [x] A guided onboarding for new users (`ONBOARDING.md`).
+- [x] A getting-started guide for new users (`GETTING_STARTED.md`).
 - [ ] (Planned) Pattern catalogues and recipes specific to HPC / scientific
   computing work, as we accumulate them.
 - [ ] (Planned) CNR-IAC data-governance notes once institutional policy is
@@ -35,7 +35,7 @@ requests welcome.
 Open an issue on this repo for corrections,
 additions, or surprising experiences worth recording. If you're not
 familiar with GitHub issues, see the step-by-step in
-[`ONBOARDING.md` §13](./ONBOARDING.md#13-getting-help).
+[`GETTING_STARTED.md` §17](./GETTING_STARTED.md#17-getting-help).
 
 ## License
 
